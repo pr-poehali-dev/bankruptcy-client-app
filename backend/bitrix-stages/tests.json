@@ -1,0 +1,19 @@
+{
+  "tests": [
+    {
+      "name": "Demo mode — без вебхука",
+      "method": "GET",
+      "path": "/?deal_id=123",
+      "expectedStatus": 200,
+      "expectedBody": { "success": true, "demo": true },
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "OPTIONS CORS preflight",
+      "method": "OPTIONS",
+      "path": "/",
+      "expectedStatus": 200,
+      "bodyMatcher": "partial"
+    }
+  ]
+}
