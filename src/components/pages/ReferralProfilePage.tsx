@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Icon from "@/components/ui/icon";
 import type { User } from "@/components/pages/AuthPage";
+
+const REFERRALS_URL = "https://functions.poehali.dev/1ce06022-c1f9-481a-a21e-f5d7c0f1de78";
 
 type Theme = "dark" | "light";
 
@@ -8,13 +10,49 @@ function getInitials(name: string) {
   return name.trim().split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
 }
 
+type ReferralStatus = "thinking" | "not_eligible" | "declined" | "contract_signed";
+
+type Referral = {
+  name: string;
+  status: ReferralStatus;
+  earned: string;
+  date: string;
+};
+
+const STATUS_CONFIG: Record<ReferralStatus, { label: string; color: string; dot: string; bg: string }> = {
+  thinking:       { label: "Думает",                  color: "text-amber-400",        dot: "bg-amber-400",    bg: "bg-amber-500/10 border-amber-500/20" },
+  not_eligible:   { label: "Не подошёл под банкротство", color: "text-muted-foreground", dot: "bg-muted-foreground", bg: "bg-muted/30 border-border/50" },
+  declined:       { label: "Отказался",               color: "text-red-400",          dot: "bg-red-400",      bg: "bg-red-500/10 border-red-500/20" },
+  contract_signed:{ label: "Договор заключён",        color: "text-green-400",        dot: "bg-green-400",    bg: "bg-green-500/10 border-green-500/20" },
+};
+
 // ─── REFERRAL ─────────────────────────────────────────────────────────────────
 export function ReferralPage() {
   const [tab, setTab] = useState<"overview" | "materials">("overview");
-  const referrals = [
-    { name: "Дмитрий С.", status: "Завершено", earned: "10 000 ₽", date: "15.01.2025" },
-    { name: "Мария К.", status: "В процессе", earned: "—", date: "01.03.2025" },
-  ];
+  const [referrals, setReferrals] = useState<Referral[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [totalEarned, setTotalEarned] = useState(0);
+
+  useEffect(() => {
+    fetch(`${REFERRALS_URL}/`)
+      .then(r => r.json())
+      .then(data => {
+        if (data.success && data.referrals) {
+          const mapped: Referral[] = data.referrals.map((r: {
+            name: string; status: ReferralStatus; earned: number; date: string;
+          }) => ({
+            name: r.name,
+            status: r.status,
+            earned: r.earned > 0 ? `${r.earned.toLocaleString("ru-RU")} ₽` : "—",
+            date: r.date,
+          }));
+          setReferrals(mapped);
+          setTotalEarned(data.summary?.total_earned ?? 0);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
 
   return (
     <div className="p-4 md:p-6 space-y-6">
@@ -26,8 +64,12 @@ export function ReferralPage() {
       <div className="glass-card neon-border-purple rounded-2xl p-6 animate-fade-in-up stagger-1 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-32 h-32 rounded-full bg-purple-500/5 blur-2xl" />
         <p className="text-sm text-muted-foreground mb-1">Заработано</p>
-        <p className="text-5xl font-black font-oswald neon-text-purple mb-2">10 000 ₽</p>
-        <p className="text-sm text-muted-foreground">За 1 успешную рекомендацию</p>
+        <p className="text-5xl font-black font-oswald neon-text-purple mb-2">
+          {loading ? "—" : `${totalEarned.toLocaleString("ru-RU")} ₽`}
+        </p>
+        <p className="text-sm text-muted-foreground">
+          {loading ? "Загружаем данные..." : `За ${referrals.filter(r => r.status === "contract_signed").length} успешных рекомендаций · бонус при заключении договора`}
+        </p>
         <button className="mt-4 gradient-blue-purple text-white text-sm font-semibold px-5 py-2.5 rounded-xl glow-blue hover:opacity-90 transition-opacity">
           Вывести бонусы
         </button>
@@ -92,27 +134,55 @@ export function ReferralPage() {
           </div>
 
           <div className="glass-card rounded-2xl p-5">
-            <h2 className="font-bold text-foreground mb-4 flex items-center gap-2">
-              <Icon name="Users" size={18} className="text-primary" />
-              Мои рефералы
-            </h2>
-            {referrals.map((r, i) => (
-              <div key={i} className="flex items-center gap-3 py-3 border-b border-border/50 last:border-0">
-                <div className="w-9 h-9 rounded-full gradient-blue-purple flex items-center justify-center text-white font-bold text-sm">
-                  {r.name[0]}
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-foreground">{r.name}</p>
-                  <div className="flex items-center gap-1 mt-0.5">
-                    <div className={`w-1.5 h-1.5 rounded-full ${r.status === "Завершено" ? "bg-green-400" : "bg-amber-400"}`} />
-                    <p className="text-xs text-muted-foreground">{r.status} · {r.date}</p>
-                  </div>
-                </div>
-                <span className={`text-sm font-bold ${r.earned !== "—" ? "text-green-400" : "text-muted-foreground"}`}>
-                  {r.earned}
-                </span>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-bold text-foreground flex items-center gap-2">
+                <Icon name="Users" size={18} className="text-primary" />
+                Мои рефералы
+              </h2>
+              {loading ? (
+                <div className="w-4 h-4 border-2 border-primary/40 border-t-primary rounded-full animate-spin" />
+              ) : (
+                <span className="text-xs text-muted-foreground">{referrals.length} чел.</span>
+              )}
+            </div>
+            {loading && (
+              <div className="space-y-2">
+                {[1, 2, 3].map(i => (
+                  <div key={i} className="h-16 rounded-xl bg-muted/30 animate-pulse" />
+                ))}
               </div>
-            ))}
+            )}
+            <div className="space-y-2">
+              {!loading && referrals.map((r, i) => {
+                const cfg = STATUS_CONFIG[r.status];
+                return (
+                  <div key={i} className={`flex items-center gap-3 p-3 rounded-xl border ${cfg.bg}`}>
+                    <div className="w-9 h-9 rounded-full gradient-blue-purple flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+                      {r.name[0]}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-foreground">{r.name}</p>
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${cfg.dot}`} />
+                        <p className={`text-xs font-medium ${cfg.color}`}>{cfg.label}</p>
+                        <span className="text-xs text-muted-foreground">· {r.date}</span>
+                      </div>
+                    </div>
+                    <span className={`text-sm font-bold flex-shrink-0 ${r.status === "contract_signed" ? "text-green-400" : "text-muted-foreground"}`}>
+                      {r.earned}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="mt-4 pt-3 border-t border-border/50 grid grid-cols-2 gap-2">
+              {(Object.entries(STATUS_CONFIG) as [ReferralStatus, typeof STATUS_CONFIG[ReferralStatus]][]).map(([key, cfg]) => (
+                <div key={key} className="flex items-center gap-2">
+                  <div className={`w-2 h-2 rounded-full flex-shrink-0 ${cfg.dot}`} />
+                  <span className="text-xs text-muted-foreground">{cfg.label}</span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       ) : (

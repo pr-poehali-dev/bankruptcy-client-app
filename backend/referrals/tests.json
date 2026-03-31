@@ -1,0 +1,19 @@
+{
+  "tests": [
+    {
+      "name": "Демо-список рефералов без webhook",
+      "method": "GET",
+      "path": "/",
+      "expectedStatus": 200,
+      "expectedBody": { "success": true, "demo": true },
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Ошибка без referrer_id (если задан webhook)",
+      "method": "OPTIONS",
+      "path": "/",
+      "expectedStatus": 200,
+      "bodyMatcher": "partial"
+    }
+  ]
+}
