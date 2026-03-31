@@ -1,0 +1,37 @@
+{
+  "tests": [
+    {
+      "name": "OPTIONS preflight",
+      "method": "OPTIONS",
+      "path": "/",
+      "expectedStatus": 200,
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "GET /?action=me без токена — 401",
+      "method": "GET",
+      "path": "/?action=me",
+      "expectedStatus": 401,
+      "expectedBody": {"success": false},
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "POST /?action=login суперадмин",
+      "method": "POST",
+      "path": "/?action=login",
+      "body": {"phone": "+79000000000", "password": "admin123", "role": "superadmin"},
+      "expectedStatus": 200,
+      "expectedBody": {"success": true, "role": "superadmin"},
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "POST /?action=login неверный пароль",
+      "method": "POST",
+      "path": "/?action=login",
+      "body": {"phone": "+79000000000", "password": "wrong_xyz_123", "role": "superadmin"},
+      "expectedStatus": 401,
+      "expectedBody": {"success": false},
+      "bodyMatcher": "partial"
+    }
+  ]
+}

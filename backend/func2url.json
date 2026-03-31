@@ -1,4 +1,7 @@
 {
+  "superadmin": "https://functions.poehali.dev/e1b14b1a-9ea8-4fce-8ec2-333399ffa424",
+  "auth": "https://functions.poehali.dev/58401716-d4f7-46b8-8315-fd4aa2d6b444",
+  "company-admin": "https://functions.poehali.dev/e6d8a27b-cfe8-41e0-9ae4-73e77b651c9a",
   "referrals": "https://functions.poehali.dev/1ce06022-c1f9-481a-a21e-f5d7c0f1de78",
   "bitrix-stages": "https://functions.poehali.dev/d8cffbef-28c9-4cbc-9574-d1dabb3929f2"
 }
