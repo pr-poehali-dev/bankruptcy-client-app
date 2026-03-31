@@ -1,13 +1,20 @@
 import Icon from "@/components/ui/icon";
+import type { User } from "@/components/pages/AuthPage";
 
 type Page = "home" | "finance" | "chat" | "case" | "referral" | "profile";
 
+function getInitials(name: string) {
+  return name.trim().split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
+}
+
 // ─── HOME ─────────────────────────────────────────────────────────────────────
-export function HomePage({ onNavigate, caseStages, loadingStages }: {
+export function HomePage({ onNavigate, caseStages, loadingStages, user }: {
   onNavigate: (p: Page) => void;
   caseStages: { title: string; done: boolean; active?: boolean; date: string }[];
   loadingStages: boolean;
+  user?: User;
 }) {
+  const displayName = user?.name ?? "Клиент";
   const stats = [
     { label: "Тариф", value: "Стандарт", sub: "Полное сопровождение", icon: "Star", color: "blue" },
     { label: "Оплачено", value: "45 000 ₽", sub: "из 90 000 ₽", icon: "CheckCircle", color: "green" },
@@ -22,11 +29,11 @@ export function HomePage({ onNavigate, caseStages, loadingStages }: {
         <div className="relative">
           <div className="flex items-center gap-3 mb-3">
             <div className="w-12 h-12 rounded-full gradient-blue-purple flex items-center justify-center text-white font-bold text-lg">
-              АИ
+              {getInitials(displayName)}
             </div>
             <div>
               <p className="text-muted-foreground text-sm">Добро пожаловать,</p>
-              <h1 className="text-xl font-bold text-foreground">Алексей Иванов</h1>
+              <h1 className="text-xl font-bold text-foreground">{displayName}</h1>
             </div>
             <div className="ml-auto flex items-center gap-2 bg-green-500/10 border border-green-500/30 rounded-full px-3 py-1">
               <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />

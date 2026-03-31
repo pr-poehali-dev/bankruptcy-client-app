@@ -1,7 +1,12 @@
 import { useState } from "react";
 import Icon from "@/components/ui/icon";
+import type { User } from "@/components/pages/AuthPage";
 
 type Theme = "dark" | "light";
+
+function getInitials(name: string) {
+  return name.trim().split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
+}
 
 // ─── REFERRAL ─────────────────────────────────────────────────────────────────
 export function ReferralPage() {
@@ -134,13 +139,19 @@ export function ReferralPage() {
 }
 
 // ─── PROFILE ──────────────────────────────────────────────────────────────────
-export function ProfilePage({ theme, onToggleTheme }: { theme: Theme; onToggleTheme: () => void }) {
+export function ProfilePage({ theme, onToggleTheme, user, onLogout }: {
+  theme: Theme;
+  onToggleTheme: () => void;
+  user?: User;
+  onLogout?: () => void;
+}) {
+  const displayName = user?.name ?? "Клиент";
   const info = [
-    { label: "ФИО", value: "Иванов Алексей Игоревич", icon: "User" },
-    { label: "Телефон", value: "+7 (999) 123-45-67", icon: "Phone" },
-    { label: "Email", value: "a.ivanov@mail.ru", icon: "Mail" },
-    { label: "Дата рождения", value: "12.05.1985", icon: "Calendar" },
-    { label: "ИНН", value: "7712345678", icon: "Hash" },
+    { label: "ФИО", value: displayName, icon: "User" },
+    { label: "Телефон", value: user?.phone ?? "—", icon: "Phone" },
+    { label: "Email", value: "—", icon: "Mail" },
+    { label: "Дата рождения", value: "—", icon: "Calendar" },
+    { label: "ИНН", value: "—", icon: "Hash" },
   ];
   const security = [
     { label: "Двухфакторная аутентификация", enabled: true },
@@ -152,9 +163,9 @@ export function ProfilePage({ theme, onToggleTheme }: { theme: Theme; onToggleTh
     <div className="p-4 md:p-6 space-y-6">
       <div className="glass-card rounded-2xl p-6 text-center animate-fade-in-up mesh-bg">
         <div className="w-20 h-20 rounded-full gradient-blue-purple flex items-center justify-center text-white text-3xl font-bold mx-auto mb-4 glow-blue">
-          АИ
+          {getInitials(displayName)}
         </div>
-        <h2 className="text-xl font-bold text-foreground">Алексей Иванов</h2>
+        <h2 className="text-xl font-bold text-foreground">{displayName}</h2>
         <p className="text-muted-foreground text-sm">Клиент с ноября 2024</p>
         <div className="flex items-center justify-center gap-1 mt-2">
           <Icon name="ShieldCheck" size={14} className="text-green-400" />
@@ -227,7 +238,10 @@ export function ProfilePage({ theme, onToggleTheme }: { theme: Theme; onToggleTh
         </p>
       </div>
 
-      <button className="w-full glass-card rounded-2xl p-4 flex items-center justify-center gap-2 text-destructive border-destructive/20 hover:bg-destructive/10 transition-colors animate-fade-in-up stagger-4">
+      <button
+        onClick={onLogout}
+        className="w-full glass-card rounded-2xl p-4 flex items-center justify-center gap-2 text-destructive border-destructive/20 hover:bg-destructive/10 transition-colors animate-fade-in-up stagger-4"
+      >
         <Icon name="LogOut" size={18} />
         <span className="font-medium">Выйти из аккаунта</span>
       </button>

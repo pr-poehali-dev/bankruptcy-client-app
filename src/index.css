@@ -129,11 +129,17 @@
       0 0 20px hsl(199 100% 55% / 0.8),
       0 0 40px hsl(199 100% 55% / 0.4);
   }
+  .light .neon-text-blue {
+    text-shadow: none;
+  }
   .neon-text-purple {
     color: hsl(var(--neon-purple));
     text-shadow:
       0 0 20px hsl(280 100% 65% / 0.8),
       0 0 40px hsl(280 100% 65% / 0.4);
+  }
+  .light .neon-text-purple {
+    text-shadow: none;
   }
   .neon-border-blue {
     border-color: hsl(199 100% 55% / 0.4);
@@ -317,16 +323,16 @@
 }
 
 .chat-bubble-in {
-  background: hsl(222 25% 14%);
+  background: hsl(var(--muted));
   border-radius: 18px 18px 18px 4px;
 }
 .chat-bubble-out {
   background: linear-gradient(
     135deg,
-    hsl(199 100% 55% / 0.2),
-    hsl(280 100% 65% / 0.15)
+    hsl(var(--primary) / 0.2),
+    hsl(var(--accent) / 0.15)
   );
-  border: 1px solid hsl(199 100% 55% / 0.3);
+  border: 1px solid hsl(var(--primary) / 0.3);
   border-radius: 18px 18px 4px 18px;
 }
 
@@ -334,12 +340,12 @@
   width: 4px;
 }
 ::-webkit-scrollbar-track {
-  background: hsl(222 35% 6%);
+  background: hsl(var(--background));
 }
 ::-webkit-scrollbar-thumb {
-  background: hsl(199 100% 55% / 0.3);
+  background: hsl(var(--primary) / 0.3);
   border-radius: 2px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: hsl(199 100% 55% / 0.6);
+  background: hsl(var(--primary) / 0.6);
 }

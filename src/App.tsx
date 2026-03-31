@@ -3,6 +3,7 @@ import Icon from "@/components/ui/icon";
 import { HomePage, FinancePage } from "@/components/pages/HomeFinancePage";
 import { ChatPage, CasePage } from "@/components/pages/ChatCasePage";
 import { ReferralPage, ProfilePage } from "@/components/pages/ReferralProfilePage";
+import { AuthPage, type User } from "@/components/pages/AuthPage";
 
 type Page = "home" | "finance" | "chat" | "case" | "referral" | "profile";
 type Theme = "dark" | "light";
@@ -26,7 +27,19 @@ const DEFAULT_STAGES = [
   { title: "Завершение. Долги списаны", done: false, date: "~июнь 2025", desc: "Списание оставшихся долгов", icon: "Trophy" },
 ];
 
+function getInitials(name: string) {
+  return name.trim().split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
+}
+
 export default function App() {
+  const [user, setUser] = useState<User | null>(() => {
+    try {
+      const saved = localStorage.getItem("current_user");
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
   const [page, setPage] = useState<Page>("home");
   const [theme, setTheme] = useState<Theme>("dark");
   const [caseStages, setCaseStages] = useState(DEFAULT_STAGES);
@@ -44,6 +57,7 @@ export default function App() {
   }, [theme]);
 
   useEffect(() => {
+    if (!user) return;
     setLoadingStages(true);
     fetch(`${BITRIX_URL}/?deal_id=12345`)
       .then(r => r.json())
@@ -62,9 +76,24 @@ export default function App() {
       })
       .catch(() => {})
       .finally(() => setLoadingStages(false));
-  }, []);
+  }, [user]);
 
   const toggleTheme = useCallback(() => setTheme(t => t === "dark" ? "light" : "dark"), []);
+
+  function handleLogin(loggedUser: User) {
+    localStorage.setItem("current_user", JSON.stringify(loggedUser));
+    setUser(loggedUser);
+  }
+
+  function handleLogout() {
+    localStorage.removeItem("current_user");
+    setUser(null);
+    setPage("home");
+  }
+
+  if (!user) {
+    return <AuthPage onLogin={handleLogin} />;
+  }
 
   return (
     <div className="min-h-screen bg-background font-golos max-w-md mx-auto relative">
@@ -73,7 +102,7 @@ export default function App() {
           <div className="w-7 h-7 rounded-lg gradient-blue-purple flex items-center justify-center">
             <Icon name="Scale" size={14} className="text-white" />
           </div>
-          <span className="font-bold font-oswald text-foreground tracking-wide text-sm">Клиентское приложение</span>
+          <span className="font-bold font-oswald text-foreground tracking-wide text-sm">Клиентский портал</span>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -86,19 +115,22 @@ export default function App() {
             <Icon name="Bell" size={18} className="text-muted-foreground" />
             <span className="absolute top-0.5 right-0.5 w-2 h-2 rounded-full bg-primary" />
           </button>
-          <button className="w-8 h-8 rounded-full gradient-blue-purple flex items-center justify-center text-white text-xs font-bold">
-            АИ
+          <button
+            onClick={() => setPage("profile")}
+            className="w-8 h-8 rounded-full gradient-blue-purple flex items-center justify-center text-white text-xs font-bold"
+          >
+            {getInitials(user.name)}
           </button>
         </div>
       </header>
 
       <main className="pb-24 min-h-[calc(100vh-120px)] overflow-y-auto">
-        {page === "home" && <HomePage onNavigate={setPage} caseStages={caseStages} loadingStages={loadingStages} />}
+        {page === "home" && <HomePage onNavigate={setPage} caseStages={caseStages} loadingStages={loadingStages} user={user} />}
         {page === "finance" && <FinancePage />}
         {page === "chat" && <ChatPage />}
         {page === "case" && <CasePage stages={caseStages} loading={loadingStages} />}
         {page === "referral" && <ReferralPage />}
-        {page === "profile" && <ProfilePage theme={theme} onToggleTheme={toggleTheme} />}
+        {page === "profile" && <ProfilePage theme={theme} onToggleTheme={toggleTheme} user={user} onLogout={handleLogout} />}
       </main>
 
       <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md z-50 glass-card border-t border-border/50 px-2 py-2">
