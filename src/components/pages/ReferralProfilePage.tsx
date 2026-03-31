@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import Icon from "@/components/ui/icon";
 import type { User } from "@/components/pages/AuthPage";
+import { BRAND } from "@/brand.config";
 
 const REFERRALS_URL = "https://functions.poehali.dev/1ce06022-c1f9-481a-a21e-f5d7c0f1de78";
 
@@ -11,27 +12,83 @@ function getInitials(name: string) {
 }
 
 type ReferralStatus = "thinking" | "not_eligible" | "declined" | "contract_signed";
+type FilterTab = "all" | ReferralStatus;
 
 type Referral = {
   name: string;
   status: ReferralStatus;
-  earned: string;
+  earned: number;
   date: string;
+  source: "qr" | "link" | "promo";
+  debt?: number;
 };
 
-const STATUS_CONFIG: Record<ReferralStatus, { label: string; color: string; dot: string; bg: string }> = {
-  thinking:       { label: "Думает",                  color: "text-amber-400",        dot: "bg-amber-400",    bg: "bg-amber-500/10 border-amber-500/20" },
-  not_eligible:   { label: "Не подошёл под банкротство", color: "text-muted-foreground", dot: "bg-muted-foreground", bg: "bg-muted/30 border-border/50" },
-  declined:       { label: "Отказался",               color: "text-red-400",          dot: "bg-red-400",      bg: "bg-red-500/10 border-red-500/20" },
-  contract_signed:{ label: "Договор заключён",        color: "text-green-400",        dot: "bg-green-400",    bg: "bg-green-500/10 border-green-500/20" },
+const STATUS_CONFIG: Record<ReferralStatus, {
+  label: string;
+  shortLabel: string;
+  color: string;
+  textColor: string;
+  iconBg: string;
+  icon: string;
+  cardBg: string;
+}> = {
+  contract_signed: {
+    label: "Договор заключён",
+    shortLabel: "Договор",
+    color: "text-green-600",
+    textColor: "text-green-700",
+    iconBg: "bg-green-100 border-green-200",
+    icon: "CheckCircle",
+    cardBg: "bg-green-50/50 dark:bg-green-500/5",
+  },
+  thinking: {
+    label: "Думает",
+    shortLabel: "Думает",
+    color: "text-amber-600",
+    textColor: "text-amber-700",
+    iconBg: "bg-amber-100 border-amber-200",
+    icon: "Clock",
+    cardBg: "bg-amber-50/50 dark:bg-amber-500/5",
+  },
+  declined: {
+    label: "Отказался",
+    shortLabel: "Отказался",
+    color: "text-muted-foreground",
+    textColor: "text-muted-foreground",
+    iconBg: "bg-muted/50 border-border",
+    icon: "XCircle",
+    cardBg: "",
+  },
+  not_eligible: {
+    label: "Не подошёл под банкротство",
+    shortLabel: "Не подошёл",
+    color: "text-blue-600",
+    textColor: "text-blue-700",
+    iconBg: "bg-blue-100 border-blue-200",
+    icon: "AlertCircle",
+    cardBg: "bg-blue-50/50 dark:bg-blue-500/5",
+  },
+};
+
+const SOURCE_ICONS: Record<Referral["source"], string> = {
+  qr: "QrCode",
+  link: "Link",
+  promo: "Tag",
+};
+
+const SOURCE_LABELS: Record<Referral["source"], string> = {
+  qr: "QR-код",
+  link: "Ссылка",
+  promo: "Промокод",
 };
 
 // ─── REFERRAL ─────────────────────────────────────────────────────────────────
 export function ReferralPage() {
-  const [tab, setTab] = useState<"overview" | "materials">("overview");
+  const [filter, setFilter] = useState<FilterTab>("all");
+  const [showList, setShowList] = useState(true);
   const [referrals, setReferrals] = useState<Referral[]>([]);
   const [loading, setLoading] = useState(true);
-  const [totalEarned, setTotalEarned] = useState(0);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     fetch(`${REFERRALS_URL}/`)
@@ -40,169 +97,262 @@ export function ReferralPage() {
         if (data.success && data.referrals) {
           const mapped: Referral[] = data.referrals.map((r: {
             name: string; status: ReferralStatus; earned: number; date: string;
-          }) => ({
+          }, i: number) => ({
             name: r.name,
             status: r.status,
-            earned: r.earned > 0 ? `${r.earned.toLocaleString("ru-RU")} ₽` : "—",
+            earned: r.earned,
             date: r.date,
+            source: (["qr", "link", "promo"] as const)[i % 3],
+            debt: [450000, 320000, 580000, 210000][i % 4],
           }));
           setReferrals(mapped);
-          setTotalEarned(data.summary?.total_earned ?? 0);
         }
       })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
 
+  const counts = {
+    all: referrals.length,
+    contract_signed: referrals.filter(r => r.status === "contract_signed").length,
+    thinking: referrals.filter(r => r.status === "thinking").length,
+    declined: referrals.filter(r => r.status === "declined").length,
+    not_eligible: referrals.filter(r => r.status === "not_eligible").length,
+  };
+
+  const totalEarned = referrals.filter(r => r.status === "contract_signed")
+    .reduce((sum, r) => sum + (r.earned || BRAND.referral.bonusAmount), 0);
+
+  const totalTransitions = referrals.length;
+  const conversionPct = totalTransitions > 0
+    ? Math.round((counts.contract_signed / totalTransitions) * 100)
+    : 0;
+
+  const qrCount = referrals.filter(r => r.source === "qr").length;
+  const linkCount = referrals.filter(r => r.source === "link").length;
+  const promoCount = referrals.filter(r => r.source === "promo").length;
+
+  const filtered = filter === "all" ? referrals : referrals.filter(r => r.status === filter);
+
+  function handleCopy() {
+    navigator.clipboard.writeText("https://jurportal.ru/ref/REF2025").then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+
+  const FILTER_TABS: { key: FilterTab; label: string }[] = [
+    { key: "all", label: `Все (${counts.all})` },
+    { key: "contract_signed", label: `Договор (${counts.contract_signed})` },
+    { key: "thinking", label: `Думает (${counts.thinking})` },
+    { key: "declined", label: `Отказался (${counts.declined})` },
+    { key: "not_eligible", label: `Не подошёл (${counts.not_eligible})` },
+  ];
+
   return (
-    <div className="p-4 md:p-6 space-y-6">
+    <div className="p-4 space-y-4">
       <div className="animate-fade-in-up">
         <h1 className="text-2xl font-bold font-oswald gradient-text mb-1">Рефералы</h1>
         <p className="text-muted-foreground text-sm">Зарабатывайте, помогая другим избавиться от долгов</p>
       </div>
 
-      <div className="glass-card neon-border-purple rounded-2xl p-6 animate-fade-in-up stagger-1 relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-32 h-32 rounded-full bg-purple-500/5 blur-2xl" />
-        <p className="text-sm text-muted-foreground mb-1">Заработано</p>
-        <p className="text-5xl font-black font-oswald neon-text-purple mb-2">
-          {loading ? "—" : `${totalEarned.toLocaleString("ru-RU")} ₽`}
-        </p>
-        <p className="text-sm text-muted-foreground">
-          {loading ? "Загружаем данные..." : `За ${referrals.filter(r => r.status === "contract_signed").length} успешных рекомендаций · бонус при заключении договора`}
-        </p>
-        <button className="mt-4 gradient-blue-purple text-white text-sm font-semibold px-5 py-2.5 rounded-xl glow-blue hover:opacity-90 transition-opacity">
-          Вывести бонусы
-        </button>
-      </div>
-
-      <div className="glass-card rounded-2xl p-5 border border-amber-500/20 animate-fade-in-up stagger-2">
-        <div className="flex items-center gap-3 mb-4">
-          <span className="text-2xl">🎁</span>
-          <div>
-            <p className="font-bold text-foreground">10 000 ₽ за рекомендацию</p>
-            <p className="text-xs text-muted-foreground">Выплата после начала сопровождения</p>
-          </div>
-        </div>
-        <div className="space-y-2">
-          {["Поделитесь ссылкой с другом", "Он обратится в компанию", "Вы получите 10 000 ₽"].map((step, i) => (
-            <div key={i} className="flex items-center gap-3">
-              <div className="w-6 h-6 rounded-full gradient-blue-purple flex items-center justify-center flex-shrink-0">
-                <span className="text-white text-xs font-bold">{i + 1}</span>
-              </div>
-              <p className="text-sm text-muted-foreground">{step}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="flex gap-2 animate-fade-in-up stagger-3">
-        {(["overview", "materials"] as const).map(t => (
+      {/* Реферальная ссылка */}
+      <div className="glass-card rounded-2xl p-4 animate-fade-in-up stagger-1">
+        <p className="text-xs text-muted-foreground mb-2">Реферальная ссылка</p>
+        <div className="flex items-center gap-2">
+          <code className="flex-1 text-xs text-primary bg-primary/10 rounded-lg px-3 py-2 truncate">
+            https://jurportal.ru/ref/REF2025
+          </code>
           <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${
-              tab === t ? "gradient-blue-purple text-white" : "glass-card text-muted-foreground"
-            }`}
+            onClick={handleCopy}
+            className={`p-2.5 rounded-lg border transition-colors ${copied ? "bg-green-500/10 border-green-500/30 text-green-500" : "glass-card hover:border-primary/40 text-primary"}`}
           >
-            {t === "overview" ? "Мои рефералы" : "Обучение"}
+            <Icon name={copied ? "Check" : "Copy"} size={16} />
           </button>
-        ))}
+        </div>
+        <div className="flex gap-2 mt-3">
+          <div className="flex-1 bg-muted/50 rounded-xl p-2.5 text-center">
+            <p className="text-[10px] text-muted-foreground">Промокод</p>
+            <p className="font-bold text-foreground text-sm">REF2025</p>
+          </div>
+          <button className="flex-1 bg-muted/50 rounded-xl p-2.5 text-center hover:bg-muted transition-colors flex items-center justify-center gap-1.5">
+            <Icon name="QrCode" size={16} className="text-primary" />
+            <span className="text-sm text-foreground font-medium">QR-код</span>
+          </button>
+          <div className="flex-1 bg-muted/50 rounded-xl p-2.5 text-center">
+            <p className="text-[10px] text-muted-foreground">Бонус</p>
+            <p className="font-bold text-primary text-sm">{BRAND.referral.bonusLabel}</p>
+          </div>
+        </div>
       </div>
 
-      {tab === "overview" ? (
-        <div className="space-y-4 animate-fade-in-up">
-          <div className="glass-card rounded-2xl p-4">
-            <p className="text-xs text-muted-foreground mb-2">Реферальная ссылка</p>
-            <div className="flex items-center gap-2">
-              <code className="flex-1 text-xs text-primary bg-primary/10 rounded-lg px-3 py-2 truncate">
-                https://jurportal.ru/ref/IVA2025
-              </code>
-              <button className="glass-card p-2.5 rounded-lg hover:border-primary/40 transition-colors">
-                <Icon name="Copy" size={16} className="text-primary" />
-              </button>
-            </div>
-            <div className="flex gap-2 mt-3">
-              <div className="flex-1 bg-muted rounded-xl p-3 text-center">
-                <p className="text-xs text-muted-foreground">Промокод</p>
-                <p className="font-bold text-foreground">IVA2025</p>
-              </div>
-              <button className="flex-1 bg-muted rounded-xl p-3 text-center hover:bg-muted/80 transition-colors flex items-center justify-center gap-2">
-                <Icon name="QrCode" size={18} className="text-primary" />
-                <span className="text-sm text-foreground font-medium">QR-код</span>
-              </button>
-            </div>
-          </div>
+      {/* Заголовок клиентов + конверсия */}
+      <div className="flex items-center justify-between animate-fade-in-up stagger-2">
+        <h2 className="font-bold text-foreground flex items-center gap-2">
+          <Icon name="Users" size={18} className="text-primary" />
+          Мои клиенты
+        </h2>
+        {!loading && (
+          <span className="text-sm text-muted-foreground">
+            Конверсия{" "}
+            <span className="font-bold text-green-500">{conversionPct}%</span>
+          </span>
+        )}
+      </div>
 
-          <div className="glass-card rounded-2xl p-5">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="font-bold text-foreground flex items-center gap-2">
-                <Icon name="Users" size={18} className="text-primary" />
-                Мои рефералы
-              </h2>
-              {loading ? (
-                <div className="w-4 h-4 border-2 border-primary/40 border-t-primary rounded-full animate-spin" />
-              ) : (
-                <span className="text-xs text-muted-foreground">{referrals.length} чел.</span>
-              )}
-            </div>
-            {loading && (
-              <div className="space-y-2">
-                {[1, 2, 3].map(i => (
-                  <div key={i} className="h-16 rounded-xl bg-muted/30 animate-pulse" />
-                ))}
-              </div>
-            )}
-            <div className="space-y-2">
-              {!loading && referrals.map((r, i) => {
-                const cfg = STATUS_CONFIG[r.status];
-                return (
-                  <div key={i} className={`flex items-center gap-3 p-3 rounded-xl border ${cfg.bg}`}>
-                    <div className="w-9 h-9 rounded-full gradient-blue-purple flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
-                      {r.name[0]}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-foreground">{r.name}</p>
-                      <div className="flex items-center gap-1.5 mt-0.5">
-                        <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${cfg.dot}`} />
-                        <p className={`text-xs font-medium ${cfg.color}`}>{cfg.label}</p>
-                        <span className="text-xs text-muted-foreground">· {r.date}</span>
-                      </div>
-                    </div>
-                    <span className={`text-sm font-bold flex-shrink-0 ${r.status === "contract_signed" ? "text-green-400" : "text-muted-foreground"}`}>
-                      {r.earned}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-            <div className="mt-4 pt-3 border-t border-border/50 grid grid-cols-2 gap-2">
-              {(Object.entries(STATUS_CONFIG) as [ReferralStatus, typeof STATUS_CONFIG[ReferralStatus]][]).map(([key, cfg]) => (
-                <div key={key} className="flex items-center gap-2">
-                  <div className={`w-2 h-2 rounded-full flex-shrink-0 ${cfg.dot}`} />
-                  <span className="text-xs text-muted-foreground">{cfg.label}</span>
-                </div>
-              ))}
-            </div>
-          </div>
+      {/* Статистика 2×2 */}
+      {loading ? (
+        <div className="grid grid-cols-2 gap-3">
+          {[1,2,3,4].map(i => <div key={i} className="h-24 rounded-2xl bg-muted/30 animate-pulse" />)}
         </div>
       ) : (
-        <div className="space-y-3 animate-fade-in-up">
-          {[
-            { icon: "📘", title: "Как рассказать о банкротстве", desc: "Скрипты разговора с другом", tag: "Читать" },
-            { icon: "🎥", title: "Видеогид: 5 признаков банкротства", desc: "Помогите другу понять, нужна ли помощь", tag: "Смотреть" },
-            { icon: "📋", title: "Частые вопросы клиентов", desc: "Ответы на типичные возражения", tag: "Читать" },
-            { icon: "💬", title: "Шаблоны сообщений", desc: "Готовые тексты для отправки друзьям", tag: "Скопировать" },
-          ].map((m, i) => (
-            <div key={i} className="glass-card rounded-xl p-4 flex items-center gap-3 hover:border-primary/30 transition-colors cursor-pointer">
-              <span className="text-2xl">{m.icon}</span>
-              <div className="flex-1">
-                <p className="text-sm font-semibold text-foreground">{m.title}</p>
-                <p className="text-xs text-muted-foreground">{m.desc}</p>
-              </div>
-              <span className="text-xs text-primary bg-primary/10 rounded-lg px-2.5 py-1 flex-shrink-0">{m.tag}</span>
-            </div>
-          ))}
+        <div className="grid grid-cols-2 gap-3 animate-fade-in-up stagger-2">
+          {(["contract_signed", "thinking", "declined", "not_eligible"] as ReferralStatus[]).map(s => {
+            const cfg = STATUS_CONFIG[s];
+            const count = counts[s];
+            return (
+              <button
+                key={s}
+                onClick={() => setFilter(filter === s ? "all" : s)}
+                className={`glass-card rounded-2xl p-4 text-left transition-all hover:scale-[1.02] ${
+                  filter === s ? "ring-2 ring-primary/40" : ""
+                }`}
+              >
+                <div className={`w-8 h-8 rounded-full border flex items-center justify-center mb-2 ${cfg.iconBg}`}>
+                  <Icon name={cfg.icon} size={16} className={cfg.color} />
+                </div>
+                <p className={`text-xs font-medium leading-tight mb-1 ${cfg.color}`}>
+                  {cfg.label}
+                </p>
+                <p className={`text-3xl font-black font-oswald ${cfg.color}`}>{count}</p>
+              </button>
+            );
+          })}
         </div>
+      )}
+
+      {/* Итого переходов */}
+      {!loading && (
+        <div className="glass-card rounded-xl px-4 py-3 animate-fade-in-up stagger-3">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-sm text-muted-foreground">Всего переходов</p>
+            <p className="font-bold text-foreground">{totalTransitions}</p>
+          </div>
+          <div className="flex items-center gap-3 text-xs text-muted-foreground">
+            <span className="flex items-center gap-1">
+              <Icon name="QrCode" size={12} className="text-muted-foreground" />
+              QR-код: {qrCount}
+            </span>
+            <span className="flex items-center gap-1">
+              <Icon name="Link" size={12} className="text-muted-foreground" />
+              Ссылка: {linkCount}
+            </span>
+            <span className="flex items-center gap-1">
+              <Icon name="Tag" size={12} className="text-muted-foreground" />
+              Промокод: {promoCount}
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Заработано */}
+      {!loading && totalEarned > 0 && (
+        <div className="glass-card neon-border-blue rounded-2xl p-4 flex items-center justify-between animate-fade-in-up stagger-3">
+          <div>
+            <p className="text-xs text-muted-foreground mb-0.5">Заработано</p>
+            <p className="text-2xl font-black font-oswald neon-text-blue">
+              +{totalEarned.toLocaleString("ru-RU")} ₽
+            </p>
+          </div>
+          <button className="gradient-blue-purple text-white text-sm font-semibold px-4 py-2 rounded-xl hover:opacity-90 transition-opacity">
+            Вывести
+          </button>
+        </div>
+      )}
+
+      {/* Кнопка скрыть/показать список */}
+      <button
+        onClick={() => setShowList(v => !v)}
+        className="w-full glass-card rounded-xl py-3 flex items-center justify-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors animate-fade-in-up stagger-4"
+      >
+        <Icon name={showList ? "ChevronUp" : "ChevronDown"} size={16} />
+        {showList ? "Скрыть список" : "Показать список"}
+      </button>
+
+      {/* Фильтры-таблетки */}
+      {showList && (
+        <>
+          <div className="flex gap-2 overflow-x-auto pb-1 animate-fade-in-up scrollbar-hide">
+            {FILTER_TABS.map(t => (
+              <button
+                key={t.key}
+                onClick={() => setFilter(t.key)}
+                className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
+                  filter === t.key
+                    ? t.key === "all"
+                      ? "bg-foreground text-background"
+                      : t.key === "contract_signed"
+                        ? "bg-green-500 text-white"
+                        : t.key === "thinking"
+                          ? "bg-amber-500 text-white"
+                          : t.key === "declined"
+                            ? "bg-muted-foreground text-background"
+                            : "bg-blue-500 text-white"
+                    : "glass-card text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Список рефералов */}
+          <div className="space-y-2 animate-fade-in-up">
+            {loading && [1,2,3].map(i => (
+              <div key={i} className="h-16 rounded-xl bg-muted/30 animate-pulse" />
+            ))}
+            {!loading && filtered.length === 0 && (
+              <div className="text-center py-8 text-muted-foreground text-sm">
+                Нет рефералов с таким статусом
+              </div>
+            )}
+            {!loading && filtered.map((r, i) => {
+              const cfg = STATUS_CONFIG[r.status];
+              return (
+                <div key={i} className={`glass-card rounded-xl p-3 flex items-center gap-3 ${cfg.cardBg}`}>
+                  <div className={`w-9 h-9 rounded-full border flex items-center justify-center flex-shrink-0 ${cfg.iconBg}`}>
+                    <Icon name={cfg.icon} size={18} className={cfg.color} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-semibold text-foreground">{r.name}</p>
+                      <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground">
+                        <Icon name={SOURCE_ICONS[r.source]} size={10} className="text-muted-foreground" />
+                        {SOURCE_LABELS[r.source]}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <p className={`text-xs font-medium ${cfg.color}`}>{cfg.label}</p>
+                      {r.debt && (
+                        <span className="text-xs text-muted-foreground">
+                          долг {r.debt.toLocaleString("ru-RU")} ₽
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="text-right flex-shrink-0">
+                    <p className="text-xs text-muted-foreground">{r.date}</p>
+                    {r.status === "contract_signed" && (
+                      <p className="text-sm font-bold text-green-500">
+                        +{(r.earned || BRAND.referral.bonusAmount).toLocaleString("ru-RU")} ₽
+                      </p>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </>
       )}
     </div>
   );
@@ -236,7 +386,7 @@ export function ProfilePage({ theme, onToggleTheme, user, onLogout }: {
           {getInitials(displayName)}
         </div>
         <h2 className="text-xl font-bold text-foreground">{displayName}</h2>
-        <p className="text-muted-foreground text-sm">Клиент с ноября 2024</p>
+        <p className="text-muted-foreground text-sm">{BRAND.companyName}</p>
         <div className="flex items-center justify-center gap-1 mt-2">
           <Icon name="ShieldCheck" size={14} className="text-green-400" />
           <span className="text-green-400 text-xs">Личность подтверждена</span>

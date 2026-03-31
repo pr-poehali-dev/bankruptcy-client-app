@@ -4,6 +4,7 @@ import { HomePage, FinancePage } from "@/components/pages/HomeFinancePage";
 import { ChatPage, CasePage } from "@/components/pages/ChatCasePage";
 import { ReferralPage, ProfilePage } from "@/components/pages/ReferralProfilePage";
 import { AuthPage, type User } from "@/components/pages/AuthPage";
+import { BRAND } from "@/brand.config";
 
 type Page = "home" | "finance" | "chat" | "case" | "referral" | "profile";
 type Theme = "dark" | "light";
@@ -100,9 +101,13 @@ export default function App() {
       <header className="sticky top-0 z-50 glass-card border-b border-border/50 px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <div className="w-7 h-7 rounded-lg gradient-blue-purple flex items-center justify-center">
-            <Icon name="Scale" size={14} className="text-white" />
+            {BRAND.logoUrl ? (
+              <img src={BRAND.logoUrl} alt="logo" className="w-5 h-5 object-contain" />
+            ) : (
+              <Icon name={BRAND.logoIcon} size={14} className="text-white" />
+            )}
           </div>
-          <span className="font-bold font-oswald text-foreground tracking-wide text-sm">Клиентский портал</span>
+          <span className="font-bold font-oswald text-foreground tracking-wide text-sm">{BRAND.appName}</span>
         </div>
         <div className="flex items-center gap-2">
           <button
